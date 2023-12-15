@@ -1,0 +1,39 @@
+Linux Qemu PCI PT
+                   
+				--By FreedomLi
+
+1.  在BIOS/UEFI中打开 IntelVT-x 、IntelVT-d、 I/OMMU 功能; 这需要CPU本身支持，可在Intel网站查询CPU型号是否支持这些硬件特性；
+    查询网址 https://ark.intel.com/content/www/us/en/ark/search/featurefilter.html?productType=873&0_VTD=True&2_VTX=true
+
+2. 确保Linux内核包含了I/O MMU相关模块；通常Linux发行版应该都是包含的，但不一定启动了。我们需要通过添加Linux内核参数去启用这些功能。
+   step1: # vi /etc/default/grub	
+   step2: 追加参数到GRUB_CMDLINE_LINUX中，英特尔对应"intel_iommu=on", ADM对应"amd_iommu=on", 
+          例如GRUB_CMDLINE_LINUX="nofb splash=quiet console=tty0 ... intel_iommu=on
+   step3: 执行 "grub2-mkconfig -o /boot/grub2/grub.cfg" (部分Linux发行版使用grub，对应命令"grub-mkconfig -o /boot/grub/grub.cfg")
+   step4: 重启系统
+   step5: 执行 sudo dmesg | grep -e "Kernel command line"， 查看追加的参数是否生效
+   step6: 执行 sudo dmesg | grep -e "IOMMU"， 出现 "DMAR: IOMMU enable" 意味着开启成功了
+
+3. 执行 apt-get install virt-manager 以安装虚拟机管理程序（前端UI）. 创建一个虚拟机，傻瓜操作，不详细介绍了。 对于个人编写的内核等，可以在选择类型时，
+   搜索Other，并选中。
+   
+4. 安装Virt-manager时会一并安装多个工具，我们可以使用virsh工具与虚拟机进行交互。
+   例如我们和qemu的monitor窗口交互使用如下命令：
+   virsh
+   qemu-monitor-command vm-name --hmp "info cpus"
+   
+
+   
+	
+	
+	
+	
+	
+	
+	
+参考资料：
+a. https://wiki.archlinux.org/title/PCI_passthrough_via_OVMF
+b. https://access.redhat.com/documentation/en-us/red_hat_virtualization/4.0/html/installation_guide/appe-configuring_a_hypervisor_host_for_pci_passthrough
+c. https://blog.csdn.net/RichardYSteven/article/details/55116816
+d. PCI 相关： https://admin.pci-ids.ucw.cz/mods/PC?action=help?help=pci_class  
+             https://manpages.debian.org/bookworm/manpages-zh/lspci.8.zh_CN.html
