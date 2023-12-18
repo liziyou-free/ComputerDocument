@@ -22,7 +22,8 @@ Linux Qemu PCI PT
    virsh
    qemu-monitor-command vm-name --hmp "info cpus"
    
-
+       和串口交互使用：
+   console domain [devname] [--safe] [--force] [--resume]
    
 	
 	
