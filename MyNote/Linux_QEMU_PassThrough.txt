@@ -1,34 +1,56 @@
-Linux Qemu PCI PT
+Linux Qemu PCI PassThrough
                    
 				--By FreedomLi
 
-1.  在BIOS/UEFI中打开 IntelVT-x 、IntelVT-d、 I/OMMU 功能; 这需要CPU本身支持，可在Intel网站查询CPU型号是否支持这些硬件特性；
-    查询网址 https://ark.intel.com/content/www/us/en/ark/search/featurefilter.html?productType=873&0_VTD=True&2_VTX=true
 
-2. 确保Linux内核包含了I/O MMU相关模块；通常Linux发行版应该都是包含的，但不一定启动了。我们需要通过添加Linux内核参数去启用这些功能。
-   step1: # vi /etc/default/grub	
-   step2: 追加参数到GRUB_CMDLINE_LINUX中，英特尔对应"intel_iommu=on", ADM对应"amd_iommu=on", 
-          例如GRUB_CMDLINE_LINUX="nofb splash=quiet console=tty0 ... intel_iommu=on
-   step3: 执行 "grub2-mkconfig -o /boot/grub2/grub.cfg" (部分Linux发行版使用grub，对应命令"grub-mkconfig -o /boot/grub/grub.cfg")
-   step4: 重启系统
-   step5: 执行 sudo dmesg | grep -e "Kernel command line"， 查看追加的参数是否生效
-   step6: 执行 sudo dmesg | grep -e "IOMMU"， 出现 "DMAR: IOMMU enable" 意味着开启成功了
+一、添加Linux内核启动参数，以确保IOMMU等功能被启用(Linux 发行版通常包含相关模块，无需重新编译Linux内核)
 
-3. 执行 apt-get install virt-manager 以安装虚拟机管理程序（前端UI）. 创建一个虚拟机，傻瓜操作，不详细介绍了。 对于个人编写的内核等，可以在选择类型时，
-   搜索Other，并选中。
+	1.  在BIOS/UEFI中打开 IntelVT-x 、IntelVT-d、 I/OMMU 功能; 这需要CPU本身支持，可在Intel网站查询CPU型号是否支持这些硬件特性；
+		查询网址 https://ark.intel.com/content/www/us/en/ark/search/featurefilter.html?productType=873&0_VTD=True&2_VTX=true
+
+	2. 确保Linux内核包含了I/O MMU相关模块；通常Linux发行版应该都是包含的，但不一定启动了。我们需要通过添加Linux内核参数去启用这些功能。
+	   step1: # vi /etc/default/grub	
+	   step2: 追加参数到GRUB_CMDLINE_LINUX中，英特尔对应"intel_iommu=on", ADM对应"amd_iommu=on", 
+			  例如GRUB_CMDLINE_LINUX="nofb splash=quiet console=tty0 ... intel_iommu=on
+	   step3: 执行 "grub2-mkconfig -o /boot/grub2/grub.cfg" (部分Linux发行版使用grub，对应命令"grub-mkconfig -o /boot/grub/grub.cfg")
+	   step4: 重启系统
+	   step5: 执行 sudo dmesg | grep -e "Kernel command line"， 查看追加的参数是否生效
+	   step6: 执行 sudo dmesg | grep -e "IOMMU"， 出现 "DMAR: IOMMU enable" 意味着开启成功了
+
+	3. 执行 apt-get install virt-manager 以安装虚拟机管理程序（前端UI）. 创建一个虚拟机，傻瓜操作，不详细介绍了。 譬如RTOS系统内核等，可以在选择类型时，
+	   搜索Other，并选中该选项。
+	   
+	4. 安装Virt-manager时会一并安装多个工具，我们可以使用virsh工具与虚拟机进行交互。
+	   例如我们和qemu的monitor窗口交互使用如下命令：
+	   virsh
+	   qemu-monitor-command vm-name --hmp "info cpus"
+	   
+		   和串口交互使用：
+	   console domain [devname] [--safe] [--force] [--resume]
    
-4. 安装Virt-manager时会一并安装多个工具，我们可以使用virsh工具与虚拟机进行交互。
-   例如我们和qemu的monitor窗口交互使用如下命令：
-   virsh
-   qemu-monitor-command vm-name --hmp "info cpus"
-   
-       和串口交互使用：
-   console domain [devname] [--safe] [--force] [--resume]
-   
+	
+二、如何在虚拟机中使用GPU？ （主机系统：PVE）
+
+	1. 利用PCI直通功能, 步骤如下：
+	
+		step1: 在主机系统中执行 " lspci -nn "命令，找到显卡设备对应的消息行，末尾部分可以查看其PCI设备的制造商ID、设备ID.
+		       
+			   例： " 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GP108 [GeForce GT 1030] [10de:1d01] (rev a1) "
+			        
+					10de: 制造商ID   (16进制)           1d01: 设备ID  (16进制)
 	
 	
-	
-	
+		step2: 在PVE中，选中我们要配置的虚拟机，然后依次点击：添加 -> PCI设备 -> 原始设备; 选中需要直通的显卡，然后勾选"高级"复选框，对话框
+		       将会展开，我们将制造商ID和设备ID填入输入栏，然后点击添加按钮即可。
+			   
+		step3: 将线缆（VGA,HDMI，DP）插入显卡的端口.
+		
+		step4: 常规方式安装显卡驱动即可.
+		
+		
+    2. 利用vGPU技术
+	   NVIDIA 高端显卡支持此技术，可以实现虚拟显卡的功能, 利用该技术虚拟机管理系统可以为每个虚拟机分配虚拟显卡。注意：虚拟机进入系统后需要安装vGPU对应的驱动
+	   才能使用，该驱动在NVIDIA官网上看需要License.
 	
 	
 	
